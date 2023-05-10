@@ -1,0 +1,7 @@
+node_modules
+database.db
+testing.db
+dist
+.idea
+.env
+.env.testing
