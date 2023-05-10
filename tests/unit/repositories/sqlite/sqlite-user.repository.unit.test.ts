@@ -95,7 +95,7 @@ describe('Sqlite user repository', function () {
         });
 
         test("Returns undefined if row not found", async () => {
-            const createdUserId = await createInTable(db, "users", {
+            await createInTable(db, "users", {
                 username: "localadmin",
                 email: "localadmin@localhost.local",
                 password: "localadmin123",
