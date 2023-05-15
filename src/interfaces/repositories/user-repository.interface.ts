@@ -5,7 +5,8 @@ interface UserRepository {
     findByUsername: (username: string) => Promise<UserDto | undefined>,
     findByEmail: (email: string) => Promise<UserDto | undefined>,
     findByAuthenticationUuid: (authenticationUuid: string) => Promise<UserDto | undefined>,
-    create: (username: string, email: string, password: string) => Promise<number>
+    create: (username: string, email: string, password: string) => Promise<number>,
+    update: (id: number, username: string, email: string, isAdmin: boolean) => Promise<void>
 }
 
 export default UserRepository;

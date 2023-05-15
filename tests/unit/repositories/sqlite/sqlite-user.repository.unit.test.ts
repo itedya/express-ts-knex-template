@@ -3,6 +3,7 @@ import {Knex} from "knex";
 import {
     createInTable,
     findByColumnInTable,
+    getAllInTable,
     getCountInTable,
     migrateDownDatabase,
     migrateUpDatabase
@@ -15,6 +16,7 @@ import UserDto from "../../../../src/dtos/user.dto";
 import {isNumber, isString, isStringDate, isUuid} from "../../../helpers/type.test-helpers";
 import * as bcrypt from "bcrypt";
 import InvalidValueException from "../../../../src/exceptions/invalid-value.exception";
+import createTestUserModel from "../../../helpers/models/user-model.test-helper";
 
 describe('Sqlite user repository', function () {
     let db: Knex;
@@ -35,6 +37,7 @@ describe('Sqlite user repository', function () {
     });
 
     describe("Find by id function", () => {
+
         test("Finds user by id", async () => {
             const createdUserId = await createInTable(db, "users", {
                 username: "localadmin",
@@ -71,9 +74,11 @@ describe('Sqlite user repository', function () {
 
             expect(result).toBeUndefined();
         });
+
     });
 
     describe("Find by username function", () => {
+
         test("Finds user by username", async () => {
             const createdUserId = await createInTable(db, "users", {
                 username: "localadmin",
@@ -110,9 +115,11 @@ describe('Sqlite user repository', function () {
 
             expect(result).toBeUndefined();
         });
+
     })
 
     describe('Find by authentication uuid function', function () {
+
         test("Finds user by authentication uuid", async () => {
             const uuid = v4();
             const createdUserId = await createInTable(db, "users", {
@@ -128,6 +135,7 @@ describe('Sqlite user repository', function () {
 
             expect(result).toStrictEqual(plainToInstance(UserDto, user));
         });
+
         test("Returns undefined if user not found", async () => {
             await createInTable(db, "users", {
                 username: "localadmin",
@@ -140,9 +148,11 @@ describe('Sqlite user repository', function () {
 
             expect(result).toBeUndefined();
         });
+
     });
 
     describe('Create function', function () {
+
         test("Creates user and returns its id", async () => {
             expect(await getCountInTable(db, "users")).toBe(0);
 
@@ -207,6 +217,96 @@ describe('Sqlite user repository', function () {
                 expect(err.getPropName()).toStrictEqual("email");
                 expect(await getCountInTable(db, "users")).toBe(1);
             }
+        });
+
+    });
+
+    describe('Update function', function () {
+        test("Updates user, returns undefined and does not affect other rows", async () => {
+            const user = await createTestUserModel(db);
+            const otherUser = await createTestUserModel(db, {seed: 1});
+
+            const result = await userRepository.update(user.id, "new_username", "new_email", true);
+
+            expect(result).toBeUndefined();
+
+            await expect(await getCountInTable(db, "users")).toBe(2);
+
+            await findByColumnInTable(db, "users", "id", user.id)
+                .then(res => plainToInstance(UserDto, res))
+                .then(res => {
+                    expect(res.id).toStrictEqual(user.id)
+                    expect(res.username).toStrictEqual("new_username")
+                    expect(res.email).toStrictEqual("new_email")
+                    expect(res.password).toStrictEqual(user.password)
+                    expect(res.isAdmin).toStrictEqual(true)
+                    expect(res.authenticationUuid).not.toStrictEqual(user.authenticationUuid)
+                    expect(res.createdAt).toStrictEqual(user.createdAt)
+                    expect(res.updatedAt).toBeInstanceOf(Date);
+                });
+
+            await findByColumnInTable(db, "users", "id", otherUser.id)
+                .then(res => plainToInstance(UserDto, res))
+                .then(res => expect(res).toStrictEqual(otherUser));
+        });
+
+        test("If provided invalid id, throws invalid value exception with id prop", async () => {
+            const user = await createTestUserModel(db);
+
+            const wholeTable = await getAllInTable(db, "users")
+                .then(res => plainToInstance(UserDto, res));
+
+            try {
+                await userRepository.update(user.id + 1, "new_username", "new_email", true);
+                expect(false).toBeTruthy();
+            } catch (e) {
+                if (e instanceof InvalidValueException && e.getPropName() === "id") expect(true).toBeTruthy();
+                else throw e;
+            }
+
+            await getAllInTable(db, "users")
+                .then(res => plainToInstance(UserDto, res))
+                .then(res => expect(res).toStrictEqual(wholeTable));
+        });
+
+        test("If provided existing username, throws invalid value exception with username prop", async () => {
+            const user = await createTestUserModel(db);
+            const otherUser = await createTestUserModel(db, {seed: 1});
+
+            const wholeTable = await getAllInTable(db, "users")
+                .then(res => plainToInstance(UserDto, res));
+
+            try {
+                await userRepository.update(otherUser.id, user.username, otherUser.email, otherUser.isAdmin);
+                expect(false).toBeTruthy();
+            } catch (e) {
+                if (e instanceof InvalidValueException && e.getPropName() === "username") expect(true).toBeTruthy();
+                else throw e;
+            }
+
+            await getAllInTable(db, "users")
+                .then(res => plainToInstance(UserDto, res))
+                .then(res => expect(res).toStrictEqual(wholeTable));
+        });
+
+        test("If provided existing email, throws invalid value exception with email prop", async () => {
+            const user = await createTestUserModel(db);
+            const otherUser = await createTestUserModel(db, {seed: 1});
+
+            const wholeTable = await getAllInTable(db, "users")
+                .then(res => plainToInstance(UserDto, res));
+
+            try {
+                await userRepository.update(otherUser.id, otherUser.username, user.email, otherUser.isAdmin);
+                expect(false).toBeTruthy();
+            } catch (e) {
+                if (e instanceof InvalidValueException && e.getPropName() === "email") expect(true).toBeTruthy();
+                else throw e;
+            }
+
+            await getAllInTable(db, "users")
+                .then(res => plainToInstance(UserDto, res))
+                .then(res => expect(res).toStrictEqual(wholeTable));
         });
     });
 });

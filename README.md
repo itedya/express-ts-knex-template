@@ -17,7 +17,7 @@ Well-built express based template for your new application!
         - It's a sql-builder instead of ORM
     - HTTP Exceptions are written exactly the same
 - You would like TS, express, knex, env files and testing working out of the box!
-- You are tired of JWT and want a simple api-token mechanism
+- You are tired of JWT and you want a simple api-token mechanism
 - You are tired of rewriting authorization again and again in every project
 
 ## Authorization - what is happening here?

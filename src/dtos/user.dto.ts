@@ -15,7 +15,10 @@ class UserDto implements UserDef {
     @Type(() => Boolean)
     isAdmin: boolean;
 
+    @Type(() => Date)
     createdAt: Date;
+
+    @Type(() => Date)
     updatedAt: Date;
 }
 
