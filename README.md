@@ -26,8 +26,6 @@ Users table has an authenticationUuid column, **it should change its value on ev
 Token is just simply an encrypted authenticationUuid.
 Thanks to this mechanism, we receive token revoking feature that we can use whenever we want (changed authenticationUuid = revoked token).
 
-**WARNING:** update function in users repo is not yet implemented, but will be soon.
-
 ## How to start
 
 1. Download the template
