@@ -309,4 +309,40 @@ describe('Sqlite user repository', function () {
                 .then(res => expect(res).toStrictEqual(wholeTable));
         });
     });
+
+    describe('Delete function', function () {
+        test("Deletes user by id", async () => {
+            const user = await createTestUserModel(db, {seed: 0});
+            const otherUser = await createTestUserModel(db, {seed: 1});
+
+            const result = await userRepository.delete(user.id);
+
+            expect(result).toBeUndefined();
+
+            expect(
+                await getAllInTable(db, "users")
+                    .then(res => plainToInstance(UserDto, res))
+            ).toStrictEqual([otherUser]);
+        });
+
+        test("Throws invalid value exception if provided id is invalid", async () => {
+            const user = await createTestUserModel(db, {seed: 0});
+
+            try {
+                await userRepository.delete(user.id + 1);
+                expect(true).toBeFalsy();
+            } catch (e) {
+                if (e instanceof InvalidValueException && e.getPropName() === "id") {
+                    expect(true).toBeTruthy();
+                } else {
+                    throw e;
+                }
+            }
+
+            expect(
+                await getAllInTable(db, "users")
+                    .then(res => plainToInstance(UserDto, res))
+            ).toStrictEqual([user]);
+        });
+    });
 });

@@ -100,13 +100,25 @@ const update = (db: Knex) => async (id: number, username: string, email: string,
         });
 }
 
+const deleteById = (db: Knex) => (id: number) => {
+    return db.table("users")
+        .where("id", id)
+        .del()
+        .then(res => {
+            if (res !== 1) {
+                throw new InvalidValueException("id");
+            }
+        });
+}
+
 const sqliteUserRepository = (db: Knex): UserRepository => ({
     create: create(db),
     findById: findById(db),
     findByUsername: findByUsername(db),
     findByEmail: findByEmail(db),
     findByAuthenticationUuid: findByAuthenticationUuid(db),
-    update: update(db)
+    update: update(db),
+    delete: deleteById(db)
 });
 
 export default sqliteUserRepository;
