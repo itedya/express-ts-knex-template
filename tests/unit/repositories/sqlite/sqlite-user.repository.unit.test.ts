@@ -17,6 +17,7 @@ import {isNumber, isString, isStringDate, isUuid} from "../../../helpers/type.te
 import * as bcrypt from "bcrypt";
 import InvalidValueException from "../../../../src/exceptions/invalid-value.exception";
 import createTestUserModel from "../../../helpers/models/user-model.test-helper";
+import {iInRange} from "../../../helpers/general.test-helpers";
 
 describe('Sqlite user repository', function () {
     let db: Knex;
@@ -343,6 +344,54 @@ describe('Sqlite user repository', function () {
                 await getAllInTable(db, "users")
                     .then(res => plainToInstance(UserDto, res))
             ).toStrictEqual([user]);
+        });
+    });
+
+    describe('Paginated functions', function () {
+        describe('Get paginated users function', function () {
+            test("Returns paginated users (with search)", async () => {
+                let users = await Promise.all(iInRange(1, 20, 1)
+                    .map((seed) => createTestUserModel(db, {seed})));
+
+                let result = await userRepository.paginated.get(1, 10);
+
+                expect(result.items).toStrictEqual(users.slice(0, 10));
+                expect(result.total).toStrictEqual(20);
+                expect(result.perPage).toStrictEqual(10);
+                expect(result.totalPages).toStrictEqual(2);
+                expect(result.currentPage).toStrictEqual(1);
+
+                result = await userRepository.paginated.get(2, 5);
+
+                expect(result.items).toStrictEqual(users.slice(5, 10));
+                expect(result.total).toStrictEqual(20);
+                expect(result.perPage).toStrictEqual(5);
+                expect(result.totalPages).toStrictEqual(4);
+                expect(result.currentPage).toStrictEqual(2);
+
+                result = await userRepository.paginated.get(1, 5, "1");
+                expect(result.items).toStrictEqual([users[0], ...users.slice(10 - 1, 14 - 1)]);
+                expect(result.total).toStrictEqual(11);
+                expect(result.perPage).toStrictEqual(5);
+                expect(result.totalPages).toStrictEqual(3);
+                expect(result.currentPage).toStrictEqual(1);
+            });
+
+            test("Throws invalid value exception with currentPage property if current page attr is too big", async () => {
+                await Promise.all(iInRange(1, 20, 1)
+                    .map((seed) => createTestUserModel(db, {seed})));
+
+                try {
+                    await userRepository.paginated.get(4, 5, "1");
+                    expect(true).toBeFalsy();
+                } catch (e) {
+                    if (e instanceof InvalidValueException && e.getPropName() === "currentPage") {
+                        expect(true).toBeTruthy();
+                    } else {
+                        throw e;
+                    }
+                }
+            });
         });
     });
 });

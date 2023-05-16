@@ -5,6 +5,7 @@ import * as bcrypt from "bcrypt";
 import UserRepository from "../../interfaces/repositories/user-repository.interface";
 import {v4} from "uuid";
 import InvalidValueException from "../../exceptions/invalid-value.exception";
+import PaginatedData from "../../interfaces/paginated-data.interface";
 
 const findById = (db: Knex) => async (id: number): Promise<UserDto | undefined> => {
     const result = await db.select("*")
@@ -111,6 +112,44 @@ const deleteById = (db: Knex) => (id: number) => {
         });
 }
 
+const getPaginated = (db: Knex) => (currentPage: number, perPage: number, search?: string): Promise<PaginatedData<UserDto>> => {
+    const offset = perPage * (currentPage - 1);
+
+    return Promise.all([
+        db.table("users")
+            .where(builder => {
+                if (search !== undefined) {
+                    builder.whereLike("username", `%${search}%`)
+                        .orWhereLike("email", `%${search}%`)
+                }
+            })
+            .offset(offset)
+            .limit(perPage),
+        db.table("users")
+            .where(builder => {
+                if (search !== undefined) {
+                    builder.whereLike("username", `%${search}%`)
+                        .orWhereLike("email", `%${search}%`)
+                }
+            })
+            .select(db.raw("count(id) as total"))
+    ]).then(([dataRows, totalRows]) => {
+        dataRows = plainToInstance(UserDto, dataRows);
+        const total = totalRows[0].total;
+        const totalPages = Math.ceil(total / perPage);
+
+        if (currentPage > totalPages) throw new InvalidValueException("currentPage");
+
+        return {
+            total,
+            perPage,
+            currentPage,
+            totalPages,
+            items: dataRows
+        }
+    });
+};
+
 const sqliteUserRepository = (db: Knex): UserRepository => ({
     create: create(db),
     findById: findById(db),
@@ -118,7 +157,10 @@ const sqliteUserRepository = (db: Knex): UserRepository => ({
     findByEmail: findByEmail(db),
     findByAuthenticationUuid: findByAuthenticationUuid(db),
     update: update(db),
-    delete: deleteById(db)
+    delete: deleteById(db),
+    paginated: {
+        get: getPaginated(db)
+    }
 });
 
 export default sqliteUserRepository;

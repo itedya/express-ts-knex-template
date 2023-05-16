@@ -7,4 +7,8 @@ const randomString = (size: number) => {
     return res;
 }
 
-export { randomString }
+const iInRange = (from: number, to: number) => {
+    return Array(to - from + 1).fill(undefined).map((v, i) => i + from);
+}
+
+export {randomString, iInRange}
