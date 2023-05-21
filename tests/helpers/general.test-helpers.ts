@@ -13,7 +13,7 @@ const iInRange = (from: number, to: number) => {
     return Array(to - from + 1).fill(undefined).map((v, i) => i + from);
 }
 
-const serialize = (payload: any): object => {
+const serialize = (payload: any): any => {
     return JSON.parse(JSON.stringify(instanceToPlain(payload)));
 }
 

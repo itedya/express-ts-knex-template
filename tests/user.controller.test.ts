@@ -1,7 +1,13 @@
 import {Knex} from "knex";
 import {Express} from "express";
 import getDatabase from "../src/database/connection";
-import {findByColumnInTable, getCountInTable, migrateDownDatabase, migrateUpDatabase} from "./helpers/db.test-helpers";
+import {
+    findByColumnInTable,
+    getAllInTable,
+    getCountInTable,
+    migrateDownDatabase,
+    migrateUpDatabase
+} from "./helpers/db.test-helpers";
 import createApp from "../src/app";
 import supertest from "supertest";
 import createTestUserModel, {createAuthenticationToken} from "./helpers/models/user-model.test-helper";
@@ -220,7 +226,7 @@ describe('User controller', function () {
         });
 
         test("Creates admin user successfully", async () => {
-            const user = await createTestUserModel(db, { isAdmin: true });
+            const user = await createTestUserModel(db, {isAdmin: true});
             const token = await createAuthenticationToken(user.authenticationUuid);
 
             const result = await supertest(app)
@@ -302,6 +308,238 @@ describe('User controller', function () {
                 message: "BAD_REQUEST",
                 data: [BadRequestCodes.USER_EMAIL_ALREADY_TAKEN]
             });
+        });
+    });
+
+    describe('PUT / - Update user', function () {
+        test("Requires authorization", async () => {
+            const result = await supertest(app)
+                .put("/user")
+                .expect(401)
+                .then(res => res.body);
+
+            expect(result).toStrictEqual({
+                statusCode: 401,
+                message: "UNAUTHORIZED"
+            });
+        });
+
+        test("Throws forbidden when not an admin and trying to edit not logged in user", async () => {
+            const user = await createTestUserModel(db);
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const otherUser = await createTestUserModel(db, {seed: 1});
+
+            const result = await supertest(app)
+                .put("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    id: otherUser.id,
+                    username: otherUser.username,
+                    email: otherUser.email,
+                    isAdmin: otherUser.isAdmin
+                })
+                .expect(403)
+                .then(res => res.body);
+
+            expect(result).toStrictEqual({
+                statusCode: 403,
+                message: "FORBIDDEN"
+            });
+        });
+
+        test("Updates logged in user successfully", async () => {
+            const user = await createTestUserModel(db, {isAdmin: false});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const result = await supertest(app)
+                .put("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    id: user.id,
+                    username: "new_username",
+                    email: "new_email@localhost.local",
+                    isAdmin: user.isAdmin
+                })
+                .expect(200)
+                .then(res => res.body);
+
+            const updatedUser = await findByColumnInTable(db, "users", "id", user.id)
+                .then(res => plainToInstance(UserDto, res));
+
+            expect(updatedUser.username).toStrictEqual("new_username");
+            expect(updatedUser.email).toStrictEqual("new_email@localhost.local");
+            expect(updatedUser.password).toStrictEqual(user.password);
+            expect(updatedUser.isAdmin).toStrictEqual(false);
+
+            expect(updatedUser.authenticationUuid).not.toStrictEqual(user.authenticationUuid);
+
+            expect(isUuid(user.authenticationUuid)).toBeTruthy();
+            expect(updatedUser.updatedAt).toBeInstanceOf(Date);
+            expect(updatedUser.createdAt).toStrictEqual(user.createdAt);
+
+            const serializedUser = serialize(updatedUser);
+            delete serializedUser.password;
+            delete serializedUser.authenticationUuid;
+
+            expect(result).toStrictEqual(serializedUser);
+        });
+
+        test("Updates another user successfully when logged in user is an admin", async () => {
+            const user = await createTestUserModel(db, {isAdmin: true});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const otherUser = await createTestUserModel(db, {isAdmin: false, seed: 1})
+
+            const result = await supertest(app)
+                .put("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    id: otherUser.id,
+                    username: "new_username",
+                    email: "new_email@localhost.local",
+                    isAdmin: true
+                })
+                .expect(200)
+                .then(res => res.body);
+
+            expect(await findByColumnInTable(db, "users", "id", user.id)
+                .then(res => plainToInstance(UserDto, res))).toStrictEqual(user);
+
+            const updatedUser = await findByColumnInTable(db, "users", "id", otherUser.id)
+                .then(res => plainToInstance(UserDto, res));
+
+            expect(updatedUser.id).toStrictEqual(otherUser.id);
+            expect(updatedUser.username).toStrictEqual("new_username");
+            expect(updatedUser.email).toStrictEqual("new_email@localhost.local");
+            expect(updatedUser.password).toStrictEqual(otherUser.password);
+            expect(updatedUser.isAdmin).toBeTruthy();
+
+            expect(updatedUser.authenticationUuid).not.toStrictEqual(user.authenticationUuid);
+
+            expect(isUuid(user.authenticationUuid)).toBeTruthy();
+            expect(updatedUser.updatedAt).toBeInstanceOf(Date);
+            expect(updatedUser.createdAt).toStrictEqual(user.createdAt);
+
+            serialize(updatedUser)
+
+            expect(result).toStrictEqual(serialize(updatedUser));
+        })
+
+        test("Throws forbidden exception when trying to edit isAdmin without being an admin", async () => {
+            const user = await createTestUserModel(db, {isAdmin: false});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const result = await supertest(app)
+                .put("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    id: user.id,
+                    username: "new_username",
+                    email: "new_email@localhost.local",
+                    isAdmin: true
+                })
+                .expect(403)
+                .then(res => res.body);
+
+            expect(await findByColumnInTable(db, "users", "id", user.id)
+                .then(res => plainToInstance(UserDto, res))).toStrictEqual(user);
+
+            expect(result).toStrictEqual({
+                statusCode: 403,
+                message: "FORBIDDEN"
+            })
+        });
+
+        test("Throws bad request when username is not unique", async () => {
+            const user = await createTestUserModel(db, {isAdmin: true});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            await createTestUserModel(db, {seed: 1});
+
+            const before = await getAllInTable(db, "users");
+
+            expect(await getCountInTable(db, "users")).toBe(2);
+
+            const result = await supertest(app)
+                .put("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    id: user.id,
+                    username: "localadmin1",
+                    email: "localadmin@localhost.local",
+                    isAdmin: false
+                })
+                .expect(400)
+                .then(res => res.body);
+
+            expect(await getCountInTable(db, "users")).toBe(2);
+            expect(await getAllInTable(db, "users")).toStrictEqual(before);
+
+            expect(result).toStrictEqual({
+                statusCode: 400,
+                message: "BAD_REQUEST",
+                data: [BadRequestCodes.USER_USERNAME_ALREADY_TAKEN]
+            });
+        });
+
+        test("Throws bad request when email is not unique", async () => {
+            const user = await createTestUserModel(db, {isAdmin: true});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            await createTestUserModel(db, {seed: 1});
+
+            const before = await getAllInTable(db, "users");
+
+            expect(await getCountInTable(db, "users")).toBe(2);
+
+            const result = await supertest(app)
+                .put("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    id: user.id,
+                    username: "localadmin",
+                    email: "localadmin1@localhost.local",
+                    isAdmin: false
+                })
+                .expect(400)
+                .then(res => res.body);
+
+            expect(await getCountInTable(db, "users")).toBe(2);
+            expect(await getAllInTable(db, "users")).toStrictEqual(before);
+
+            expect(result).toStrictEqual({
+                statusCode: 400,
+                message: "BAD_REQUEST",
+                data: [BadRequestCodes.USER_EMAIL_ALREADY_TAKEN]
+            });
+        });
+
+        test("Throws bad request when provided id is invalid", async () => {
+            const user = await createTestUserModel(db, {isAdmin: true});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const before = await getAllInTable(db, "users");
+
+            const result = await supertest(app)
+                .put("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    id: user.id + 1,
+                    username: "new_username",
+                    email: "new_email@localhost.local",
+                    isAdmin: true
+                })
+                .expect(400)
+                .then(res => res.body);
+
+            expect(await getAllInTable(db, "users")).toStrictEqual(before);
+
+            expect(result).toStrictEqual({
+                statusCode: 400,
+                message: "BAD_REQUEST",
+                data: [BadRequestCodes.MODEL_DOES_NOT_EXIST]
+            })
         });
     });
 });

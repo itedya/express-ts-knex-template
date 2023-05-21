@@ -8,4 +8,6 @@ const userRouter = express.Router();
 
 userRouter.get("/user", ...wrapMiddlewares(authTokenMiddleware(true), userController.getPaginated));
 userRouter.post("/user", ...wrapMiddlewares(authTokenMiddleware(true), userController.create))
+userRouter.put("/user", ...wrapMiddlewares(authTokenMiddleware(true), userController.update));
+
 export default userRouter;
