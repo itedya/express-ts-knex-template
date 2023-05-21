@@ -11,6 +11,7 @@ import CreateUserRequest from "../validator/user/create-user.request";
 import InvalidValueException from "../exceptions/invalid-value.exception";
 import BadRequestHttpException, {BadRequestCodes} from "../exceptions/bad-request.http-exception";
 import UpdateUserRequest from "../validator/user/update-user.request";
+import DeleteUserRequest from "../validator/user/delete-user.request";
 
 const getPaginated: ControllerMethod = async (req, res, next) => {
     if (!req.user!.isAdmin) {
@@ -102,10 +103,35 @@ const update: ControllerMethod = async (req, res, next) => {
     res.status(200).json(instanceToPlain(result));
 }
 
+const deleteUser: ControllerMethod = async (req, res, next) => {
+    const body = plainToInstance(DeleteUserRequest, req.body);
+    const errors = await validate(body);
+
+    if (errors.length !== 0) {
+        throw new ValidationHttpException(errors);
+    }
+
+    if (body.id !== req.user!.id && !req.user!.isAdmin) {
+        throw new ForbiddenHttpException();
+    }
+
+    await unitOfWork(async function () {
+        return this.userRepository.delete(body.id);
+    })
+        .catch(err => {
+            if (err instanceof InvalidValueException && err.getPropName() === "id") throw new BadRequestHttpException(BadRequestCodes.MODEL_DOES_NOT_EXIST);
+
+            throw err;
+        });
+
+    res.status(204).send();
+}
+
 const userController = {
     getPaginated,
     create,
-    update
+    update,
+    delete: deleteUser
 }
 
 export default userController;

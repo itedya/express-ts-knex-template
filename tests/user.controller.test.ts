@@ -542,4 +542,104 @@ describe('User controller', function () {
             })
         });
     });
+
+    describe('DELETE / - Delete user', function () {
+        test("Requires authorization", async () => {
+            const result = await supertest(app)
+                .delete("/user")
+                .expect(401)
+                .then(res => res.body);
+
+            expect(result).toStrictEqual({
+                statusCode: 401,
+                message: "UNAUTHORIZED"
+            });
+        });
+
+        test("Throws forbidden when not an admin and trying to delete not logged in user", async () => {
+            const user = await createTestUserModel(db);
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const otherUser = await createTestUserModel(db, {seed: 1});
+
+            const before = await getAllInTable(db, "users");
+
+            const result = await supertest(app)
+                .delete("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({id: otherUser.id})
+                .expect(403)
+                .then(res => res.body);
+
+            expect(await getAllInTable(db, "users")).toStrictEqual(before);
+
+            expect(result).toStrictEqual({
+                statusCode: 403,
+                message: "FORBIDDEN"
+            });
+        });
+
+        test("Removes user that is logged in when not an admin", async () => {
+            const user = await createTestUserModel(db);
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            expect(await getCountInTable(db, "users")).toStrictEqual(1);
+
+            const result = await supertest(app)
+                .delete("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({id: user.id})
+                .expect(204)
+                .then(res => res.body);
+
+            expect(await getCountInTable(db, "users")).toStrictEqual(0);
+
+            expect(result).toStrictEqual({});
+        });
+
+        test("Removes any user when logged in user is admin", async () => {
+            const user = await createTestUserModel(db, {isAdmin: true});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const otherUser = await createTestUserModel(db, {isAdmin: true, seed: 1});
+
+            const before = await getAllInTable(db, "users");
+
+            const response = await supertest(app)
+                .delete("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({id: otherUser.id})
+                .expect(204)
+                .then(res => res.body);
+
+            expect(response).toStrictEqual({});
+
+            const after = await getAllInTable(db, "users");
+
+            expect(after).not.toStrictEqual(before)
+            expect(after.map(e => plainToInstance(UserDto, e))).toStrictEqual([user]);
+        });
+
+        test("Throws bad request when provided id is invalid", async () => {
+            const user = await createTestUserModel(db, {isAdmin: true});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const before = await getAllInTable(db, "users");
+
+            const response = await supertest(app)
+                .delete("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .send({id: user.id + 1})
+                .expect(400)
+                .then(res => res.body);
+
+            expect(await getAllInTable(db, "users")).toStrictEqual(before);
+
+            expect(response).toStrictEqual({
+                statusCode: 400,
+                message: "BAD_REQUEST",
+                data: [BadRequestCodes.MODEL_DOES_NOT_EXIST]
+            });
+        });
+    });
 });
