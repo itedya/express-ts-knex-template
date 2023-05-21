@@ -1,6 +1,6 @@
 import ControllerMethod from "../interfaces/controller-method.interface";
 import {instanceToPlain, plainToInstance} from "class-transformer";
-import GetPaginatedUsersRequest from "../validator/user/get-paginated-users.request";
+import GetUsersPaginatedAndByIdRequest from "../validator/user/get-users-paginated-and-by-id.request";
 import {validate} from "class-validator";
 import ValidationHttpException from "../exceptions/validation.http-exception";
 import unitOfWork from "../repositories/unit-of-work";
@@ -18,18 +18,33 @@ const getPaginated: ControllerMethod = async (req, res, next) => {
         throw new ForbiddenHttpException();
     }
 
-    const body = plainToInstance(GetPaginatedUsersRequest, req.query);
+    const body = plainToInstance(GetUsersPaginatedAndByIdRequest, req.query);
     const errors = await validate(body);
 
     if (errors.length !== 0) {
         throw new ValidationHttpException(errors);
     }
 
-    const result = await unitOfWork<PaginatedData<UserDto>>(async function () {
-        return this.userRepository.paginated.get(body.currentPage, body.perPage, body.search);
-    });
+    if (body.id !== undefined) {
+        const result = await unitOfWork<UserDto|undefined>(async function () {
+            return this.userRepository.findById(body.id);
+        });
 
-    res.status(200).json(instanceToPlain(result));
+        if (result === undefined) {
+            throw new BadRequestHttpException(BadRequestCodes.MODEL_DOES_NOT_EXIST);
+        }
+
+        res.status(200).json(instanceToPlain(result));
+    } else {
+        if (body.perPage === undefined) body.perPage = 5;
+        if (body.currentPage === undefined) body.currentPage = 1;
+
+        const result = await unitOfWork<PaginatedData<UserDto>>(async function () {
+            return this.userRepository.paginated.get(body.currentPage, body.perPage, body.search);
+        });
+
+        res.status(200).json(instanceToPlain(result));
+    }
 }
 
 const create: ControllerMethod = async (req, res, next) => {

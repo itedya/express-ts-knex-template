@@ -12,7 +12,7 @@ import createApp from "../src/app";
 import supertest from "supertest";
 import createTestUserModel, {createAuthenticationToken} from "./helpers/models/user-model.test-helper";
 import {iInRange, serialize} from "./helpers/general.test-helpers";
-import {plainToInstance} from "class-transformer";
+import {instanceToPlain, plainToInstance} from "class-transformer";
 import UserDto from "../src/dtos/user.dto";
 import bcrypt from "bcrypt";
 import {isUuid} from "./helpers/type.test-helpers";
@@ -138,6 +138,7 @@ describe('User controller', function () {
             let result = await supertest(app)
                 .get(`/user?${params.toString()}`)
                 .set("Authorization", `Bearer ${token}`)
+                .expect(200)
                 .then(res => res.body);
 
             expect(result).toStrictEqual({
@@ -163,6 +164,68 @@ describe('User controller', function () {
                 currentPage: 2,
             });
         })
+    });
+
+    describe('GET / - Find user by id', function () {
+        test("Requires authorization", async () => {
+            const result = await supertest(app)
+                .get("/user")
+                .expect(401)
+                .then(res => res.body);
+
+            expect(result).toStrictEqual({
+                statusCode: 401,
+                message: "UNAUTHORIZED"
+            })
+        });
+
+        test("Throws forbidden when not an admin", async () => {
+            const user = await createTestUserModel(db);
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const result = await supertest(app)
+                .get("/user")
+                .set("Authorization", `Bearer ${token}`)
+                .expect(403)
+                .then(res => res.body);
+
+            expect(result).toStrictEqual({
+                statusCode: 403,
+                message: "FORBIDDEN"
+            });
+        });
+
+        test("Finds user by id", async () => {
+            const user = await createTestUserModel(db, {isAdmin: true});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const otherUser = await createTestUserModel(db, {seed: 1});
+
+            const result = await supertest(app)
+                .get(`/user?id=${otherUser.id}`)
+                .set("Authorization", `Bearer ${token}`)
+                .expect(200)
+                .then(res => res.body);
+
+            expect(result).toStrictEqual(serialize(instanceToPlain(otherUser)));
+        });
+
+        test("Returns bad request if provided id is invalid", async () => {
+            const user = await createTestUserModel(db, {isAdmin: true});
+            const token = await createAuthenticationToken(user.authenticationUuid);
+
+            const result = await supertest(app)
+                .get(`/user?id=${user.id + 1}`)
+                .set("Authorization", `Bearer ${token}`)
+                .expect(400)
+                .then(res => res.body);
+
+            expect(result).toStrictEqual({
+                statusCode: 400,
+                message: "BAD_REQUEST",
+                data: [BadRequestCodes.MODEL_DOES_NOT_EXIST]
+            });
+        });
     });
 
     describe('POST / - Create user', function () {
