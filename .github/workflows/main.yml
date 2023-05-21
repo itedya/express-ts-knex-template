@@ -1,11 +1,27 @@
 name: CI
 on: push
 jobs:
-  build:
+  run_tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Install modules
-      run: npm i
-    - name: Run tests
-      run: npm test
+      - uses: actions/checkout@v2
+      - name: Install modules
+        run: npm i
+      - name: Create .env.testing
+        run: |
+          touch .env.testing
+          echo APP_ENV=testing >> .env.testing
+          echo APP_ENCRYPTION_KEY=FxY86TnpvHbIUbAz3+4gr4mCS4Nc3UGo28g8uTX9XwI= >> .env.testing
+          echo APP_ENCRYPTION_IV=NDZIdnniEe1xp5ELIvK4gw== >> .env.testing
+          echo DB_TYPE=sqlite >> .env.testing
+          echo DB_FILE=./testing.db >> .env.testing
+          cat .env.testing
+        shell: bash
+      - name: Run tests
+        env:
+          APP_ENV: testing
+          APP_ENCRYPTION_KEY: FxY86TnpvHbIUbAz3+4gr4mCS4Nc3UGo28g8uTX9XwI=
+          APP_ENCRYPTION_IV: NDZIdnniEe1xp5ELIvK4gw==
+          DB_TYPE: sqlite
+          DB_FILE: ./testing.db
+        run: npm test
