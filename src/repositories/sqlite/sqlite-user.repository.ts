@@ -24,6 +24,7 @@ const create = (db: Knex) => async (
     username: string,
     email: string,
     password: string,
+    isAdmin: boolean
 ): Promise<number> => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -32,6 +33,7 @@ const create = (db: Knex) => async (
         email,
         password: hashedPassword,
         authenticationUuid: v4(),
+        isAdmin
     }, ['id'])
         .into("users")
         .then(rows => rows[0]['id'])

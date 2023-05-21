@@ -12,6 +12,8 @@ interface Opts {
     isAdmin?: boolean,
     authenticationUuid?: string,
     password?: string
+    baseUsername?: string,
+    baseEmail?: string,
 }
 
 const createTestUserModel = async (db: Knex, opts?: Opts): Promise<UserDto> => {
@@ -19,6 +21,8 @@ const createTestUserModel = async (db: Knex, opts?: Opts): Promise<UserDto> => {
     if (opts.seed === undefined) opts.seed = 0;
     if (opts.isAdmin === undefined) opts.isAdmin = false;
     if (opts.authenticationUuid === undefined) opts.authenticationUuid = v4();
+    if (opts.baseUsername === undefined) opts.baseUsername = "localadmin%seed%";
+    if (opts.baseEmail === undefined) opts.baseEmail = "localadmin%seed%@localhost.local";
 
     let hashedPassword: string;
 
@@ -30,8 +34,8 @@ const createTestUserModel = async (db: Knex, opts?: Opts): Promise<UserDto> => {
     }
 
     const userId = await createInTable(db, "users", {
-        username: `localadmin_${opts.seed}`,
-        email: `localadmin${opts.seed}@localhost.local`,
+        username: opts.baseUsername.replace("%seed%", opts.seed.toString()),
+        email: opts.baseEmail.replace("%seed%", opts.seed.toString()),
         password: hashedPassword,
         authenticationUuid: opts.authenticationUuid,
         isAdmin: opts.isAdmin

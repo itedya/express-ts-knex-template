@@ -56,7 +56,7 @@ const register: ControllerMethod = async (req, res, next) => {
     }
 
     const user = await unitOfWork(async function() {
-        const id = await this.userRepository.create(request.username, request.email, request.password);
+        const id = await this.userRepository.create(request.username, request.email, request.password, false);
         return this.userRepository.findById(id);
     })
         .catch(err => {

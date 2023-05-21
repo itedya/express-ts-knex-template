@@ -1,25 +1,25 @@
 import supertest from "supertest";
 import {Knex} from "knex";
-import getDatabase from "../../src/database/connection";
+import getDatabase from "../src/database/connection";
 import {Express} from "express";
-import createApp from "../../src/app";
+import createApp from "../src/app";
 import {
     createInTable,
     findByColumnInTable, getAllInTable,
     getCountInTable,
     migrateDownDatabase,
     migrateUpDatabase
-} from "../helpers/db.test-helpers";
-import {testValidationExceptions} from "../helpers/request.test-helpers";
-import {randomString} from "../helpers/general.test-helpers";
+} from "./helpers/db.test-helpers";
+import {testValidationExceptions} from "./helpers/request.test-helpers";
+import {randomString} from "./helpers/general.test-helpers";
 import * as bcrypt from "bcrypt";
 import {v4} from "uuid";
 import {plainToInstance} from "class-transformer";
-import UserDto from "../../src/dtos/user.dto";
-import {isString, isUuid} from "../helpers/type.test-helpers";
-import encryptionService from "../../src/services/encryption.service";
-import configuration from "../../src/configuration";
-import {BadRequestCodes} from "../../src/exceptions/bad-request.http-exception";
+import UserDto from "../src/dtos/user.dto";
+import {isString, isUuid} from "./helpers/type.test-helpers";
+import encryptionService from "../src/services/encryption.service";
+import configuration from "../src/configuration";
+import {BadRequestCodes} from "../src/exceptions/bad-request.http-exception";
 
 describe('Auth Controller', function () {
     let db: Knex;
