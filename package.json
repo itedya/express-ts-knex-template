@@ -1,7 +1,7 @@
 {
-  "name": "wt-api",
+  "name": "express-ts-knex-template",
   "version": "1.0.0",
-  "description": "Wirtualny Tachograf API",
+  "description": "Well-built express based template for your new application!\n\n",
   "main": "src/main.ts",
   "scripts": {
     "compile": "tsc",
@@ -11,8 +11,6 @@
     "generate-encryption-keys": "node ./dist/commands/generate-encryption-keys.command.js",
     "test": "jest -i"
   },
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "@types/jest": "^29.5.1",
     "jest": "^29.5.0",
